@@ -1,5 +1,4 @@
 import os
-import strutils
 
 let commandFile = readFile(paramStr(1))
 
@@ -69,6 +68,7 @@ proc run(commands: seq[int8]) =
                 skip+=1
             if command==5:
                 skip-=1
+            continue
         else:
             case command:
                 of 0: # increases memory pointer, or moves the pointer to the right 1 block.
@@ -90,9 +90,9 @@ proc run(commands: seq[int8]) =
                     else:
                         commandI=loop_starts[loop_starts.len-1]
                 of 6: # like c getchar(). input 1 character.
-                    tape[head]=int32(parseInt(readLine(stdin)))
+                    tape[head]=int32(ord(readLine(stdin)[0]))
                 of 7: # like c putchar(). print 1 character to the console
-                    echo tape[head]
+                    stdout.write(chr(tape[head]))
                 else:
                     discard
         commandI+=1
