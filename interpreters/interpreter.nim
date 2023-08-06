@@ -1,100 +1,146 @@
 import os
 import strutils
 
-let commandFile = readFile(paramStr(1))
+type settings_tuple = tuple[ascii: bool,ascii_toogle: bool, debug: bool,breaks: bool]
+type Command = ref object
+    link_to_loop: bool
+    loop: ref seq[Command]
+    command: int
 
-func compile(commandFile: string): seq[int8] = 
-    # compiles the commandfile into a list of code numbers for each command
-    var commands: seq[int8] = @[]
+proc addLoopSequence(commandFile: string, commandFile_length: int, command_i: int, parent_command: Command, settings: settings_tuple): int =
+    var command_i: int = command_i
 
-    var comment: bool = false
-    var longComment: bool = false
-    var star_flag: bool = false
-    var comment_start_flag: bool = false
-    
-    for commandCharacter in commandFile:
+    while command_i<commandFile_length:
         #dealing with comments
-        case commandCharacter:
-            of '/':
-                if star_flag: #end long comment
-                    comment=false
-                    longComment=false
-                elif not comment:
-                    comment=true
-                    comment_start_flag=true
-            of '*':
-                    if comment_start_flag:
-                        longComment=true
-                    elif longComment:
-                        star_flag=true
-            of '\n':
-                if not longComment and comment:
-                    comment=false
-            else:
-                star_flag=false
-                comment_start_flag=false
-                #dealing with commands and disregard other characters
-        if not comment:
-            case commandCharacter:
-                of '>': # increases memory pointer, or moves the pointer to the right 1 block.
-                    commands.add(0)
-                of '<': # decreases memory pointer, or moves the pointer to the left 1 block.
-                    commands.add(1)
-                of '+': # increases value stored at the block pointed to by the memory pointer
-                    commands.add(2)
-                of '-': # decreases value stored at the block pointed to by the memory pointer
-                    commands.add(3)
-                of '[': # like c while(cur_block_value != 0) loop.
-                    commands.add(4)
-                of ']': # if block currently pointed to's value is not zero, jump back to [
-                    commands.add(5)
-                of ',': # like c getchar(). input 1 character.
-                    commands.add(6)
-                of '.': # like c putchar(). print 1 character to the console
-                    commands.add(7)
-                else:
-                    discard
-    return commands
-
-proc run(commands: seq[int8]) =
-    var tape: array[256, int32]
-    var loop_starts: seq[int] = @[]
-    var head: int32 = 0
-    var commandI = 0
-    var skip: int = 0 #skip inactive loop
-    while commandI<commands.len():
-        let command=commands[commandI]
-        if skip>0:
-            if command==4:
-                skip+=1
-            if command==5:
-                skip-=1
+        if commandFile[command_i]=='/' and command_i<commandFile_length-1:
+            if commandFile[command_i+1] == '/':
+                while command_i<commandFile_length and commandFile[command_i]!='\n':
+                    command_i+=1
+                command_i+=1
+            elif commandFile[command_i+1] == '*':
+                while command_i<commandFile_length and commandFile[command_i..command_i+1]!="*/":
+                    command_i+=1
+                command_i+=2
+        #process commands
         else:
-            case command:
-                of 0: # increases memory pointer, or moves the pointer to the right 1 block.
-                    head+=1 
-                of 1: # decreases memory pointer, or moves the pointer to the left 1 block.
-                    head-=1 
-                of 2: # increases value stored at the block pointed to by the memory pointer
-                    tape[head]+=1
-                of 3: # decreases value stored at the block pointed to by the memory pointer
-                    tape[head]-=1
-                of 4: # like c while(cur_block_value != 0) loop.
-                    if tape[head]==0:
-                        skip=1
-                    else:
-                        loop_starts.add(commandI)
-                of 5: # if block currently pointed to's value is not zero, jump back to [
-                    if tape[head]==0:
-                        loop_starts.delete(loop_starts.len-1)
-                    else:
-                        commandI=loop_starts[loop_starts.len-1]
-                of 6: # like c getchar(). input 1 character.
-                    tape[head]=int32(parseInt(readLine(stdin)))
-                of 7: # like c putchar(). print 1 character to the console
-                    echo tape[head]
+            case commandFile[command_i]:
+                of '>': # increases memory pointer, or moves the pointer to the right 1 block.
+                    parent_command.loop[].add(Command(link_to_loop: false , command: 0))
+                of '<': # decreases memory pointer, or moves the pointer to the left 1 block.
+                    parent_command.loop[].add(Command(link_to_loop: false , command: 1))
+                of '+': # increases value stored at the block pointed to by the memory pointer
+                    parent_command.loop[].add(Command(link_to_loop: false , command: 2))
+                of '-': # decreases value stored at the block pointed to by the memory pointer
+                    parent_command.loop[].add(Command(link_to_loop: false , command: 3))
+                of ',': # like c getchar(). input 1 character.
+                    parent_command.loop[].add(Command(link_to_loop: false , command: 4))
+                of '.': # like c putchar(). print 1 character to the console
+                    parent_command.loop[].add(Command(link_to_loop: false , command: 5))
+                of 'a': #toogles between ascii and numeric input/output
+                    if settings.ascii_toogle:
+                        parent_command.loop[].add(Command(link_to_loop: false , command: 6))
+                of 'd': #prints the entire tape
+                    if settings.debug:
+                        parent_command.loop[].add(Command(link_to_loop: false , command: 7))
+                of 'b': #waits for user input before proceeding
+                    if settings.breaks:
+                        parent_command.loop[].add(Command(link_to_loop: false , command: 8))
+                of '[': # like c while(cur_block_value != 0) loop.
+                    let new_command=Command(link_to_loop: true, loop: new seq[Command], command: 0)
+                    parent_command.loop[].add(new_command)
+                    command_i=addLoopSequence(commandFile,commandFile_length,command_i+1,new_command,settings)
+                of ']': # if block currently pointed to's value is not zero, jump back to [
+                    return command_i
                 else:
                     discard
-        commandI+=1
+            command_i+=1
+            
+func compile(commandFile: string, settings: settings_tuple): Command = 
+    # compiles the commandfile into a list of code numbers for each command
+    var main_command: Command = Command(link_to_loop: true, loop: new seq[Command], command: 0)
+    discard addLoopSequence(commandFile,commandFile.len(),0,main_command,settings)
+    return main_command
 
-run(compile(commandFile))
+
+proc runCommand(command: Command, tape: ref array[128, int], head: ref int, ascii: ref bool) =
+    if command.link_to_loop:
+        while tape[][head[]]!=0:
+            for sub_c in command.loop[]:
+                runCommand(sub_c,tape,head,ascii)
+    else:
+        case command.command:
+            of 0: #>
+                head[]+=1
+            of 1: #<
+                head[]-=1
+            of 2: #+
+                tape[][head[]]+=1
+            of 3: #-
+                tape[][head[]]-=1
+            of 4: #,
+                if ascii[]:
+                    tape[][head[]]=int(readChar(stdin))
+                else:
+                    tape[][head[]]=parseInt(readLine(stdin))
+            of 5: #.
+                if ascii[]:
+                    stdout.write(chr(tape[][head[]]))
+                else:
+                    echo tape[][head[]]
+                stdout.flushFile()
+            of 6: #a
+                ascii[]=not ascii[]
+            of 7: #d
+                echo "Tape: ",tape[]
+                echo "Head: ",head[], " Ascii Toogle: ", ascii[]
+            of 8: #b
+                discard readLine(stdin)
+            else:
+                discard
+
+proc run(main_command: Command, ascii_old: bool) =
+    var tape: ref array[128, int] = new array[128, int]
+    var head: ref int = new int
+    var ascii: ref bool = new bool
+    ascii[] = ascii_old
+    for sub_c in main_command.loop[]:
+        runCommand(sub_c,tape,head,ascii)
+
+proc main() =
+    var cli_args: seq[string]
+    let cli_arg_count = paramCount()
+    for arg_i in countup(1,cli_arg_count):
+        cli_args.add(paramStr(arg_i))
+    if cli_arg_count>0:
+        if cli_args[0] in "--help":
+            echo "-h --help: this message" /
+            "\n-a --ascii: display output as ascii" /
+            "\n-at --ascii_toogle: add 'a' command to brainfuck, that toggles between ascii and number outputs" /
+            "\n-d --debug: add 'd' command to brainfuck, that prints debug information" /
+            "\n-b --breaks: add 'b' command into brainfuck, that holds the code"
+        else:
+            var error_occured: bool = false
+            var commandFile: string
+            try:
+                commandFile = readFile(cli_args[^1])
+            except CatchableError:
+                echo "Error: Can't input open file"
+                error_occured = true
+            if not error_occured:
+                var settings: settings_tuple = (false,false,false,false)
+                for arg in cli_args[0..^2]:
+                    case arg:
+                        of "-a", "--ascii":
+                            settings.ascii = true
+                        of "-at", "--ascii_toogle":
+                            settings.ascii_toogle = true
+                        of "-d", "--debug":
+                            settings.debug = true
+                        of "-b", "--breaks":
+                            settings.breaks = true
+                        else:
+                            echo "Unknown argument: ", arg
+                run(compile(commandFile,settings),settings.ascii)
+    else:
+        echo "No arguments! Enter -h for help"
+main()
