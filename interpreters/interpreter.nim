@@ -1,7 +1,15 @@
 import os
 import strutils
 
-type settings_tuple = tuple[ascii: bool,ascii_toogle: bool, debug: bool,breaks: bool]
+type settings_tuple = tuple[
+    ascii: bool,
+    ascii_toogle: bool,
+    debug: bool,
+    breaks: bool,
+    tape_size:int,
+    transpile: char,
+    output_file: string
+]
 type Command = ref object
     link_to_loop: bool
     loop: ref seq[Command]
@@ -57,12 +65,11 @@ proc addLoopSequence(commandFile: string, commandFile_length: int, command_i: in
             
 func compile(commandFile: string, settings: settings_tuple): Command = 
     # compiles the commandfile into a list of code numbers for each command
-    var main_command: Command = Command(link_to_loop: true, loop: new seq[Command], command: 0)
+    var main_command: Command = Command(link_to_loop: true, loop: new seq[Command])
     discard addLoopSequence(commandFile,commandFile.len(),0,main_command,settings)
     return main_command
 
-
-proc runCommand(command: Command, tape: ref array[128, int], head: ref int, ascii: ref bool) =
+proc runCommand(command: Command, tape: ref seq[int], head: ref int, ascii: ref bool) =
     if command.link_to_loop:
         while tape[][head[]]!=0:
             for sub_c in command.loop[]:
@@ -98,17 +105,91 @@ proc runCommand(command: Command, tape: ref array[128, int], head: ref int, asci
             else:
                 discard
 
-proc run(main_command: Command, ascii_old: bool) =
-    var tape: ref array[128, int] = new array[128, int]
+proc run(main_command: Command, settings: settings_tuple) =
+    var tape: ref seq[int] = new seq[int]; tape[].setLen(settings.tape_size)
     var head: ref int = new int
     var ascii: ref bool = new bool
-    ascii[] = ascii_old
+    ascii[] = settings.ascii
     for sub_c in main_command.loop[]:
         runCommand(sub_c,tape,head,ascii)
 
+proc transpile_command_to_c(command: int, command_stack: int, ascii: ref bool): string =
+    if command_stack==0:
+        return " "
+    case command:
+        of 0:
+            return "head = head + " & $command_stack & ";"
+        of 1:
+            return "head = head - " & $command_stack & ";"
+        of 2:
+            return "tape[head] = tape[head] + " & $command_stack & ";"
+        of 3:
+            return "tape[head] = tape[head] - " & $command_stack & ";"
+        of 4:
+            if ascii[]:
+                return "tape[head] = getchar();"
+            else:
+                return "scanf(\"%d\",&tape[head])"
+        of 5:
+            if ascii[]:
+                return "printf(\"%c\",tape[head]);"
+            else:
+                return "printf(\"%d\",tape[head]);"
+        of 6:
+            ascii[]=not ascii[]
+        else:
+            discard
+    return ""
+
+proc transpile_loop_to_c(command: Command, ascii: ref bool,indentation: int): seq[string] =
+    var c_code: seq[string] = @[]
+    var command_stack = 0
+    var last_command = 0
+    var c_i = 0
+    while c_i<command.loop[].len():
+        let this_command = command.loop[][c_i]
+        if this_command.link_to_loop:
+            c_code.add(strutils.repeat("    ",indentation) & transpile_command_to_c(last_command,command_stack,ascii))
+            last_command=0
+            command_stack=0
+
+            c_code.add(strutils.repeat("    ",indentation) & "while (tape[head]!=0) {")
+            c_code &= transpile_loop_to_c(this_command,ascii,indentation+1)
+            c_code.add(strutils.repeat("    ",indentation) & "}")
+        elif this_command.command == last_command:
+            command_stack+=1
+        else:
+            c_code.add(strutils.repeat("    ",indentation) & transpile_command_to_c(last_command,command_stack,ascii))
+            last_command=this_command.command
+            command_stack=1
+        c_i+=1
+    c_code.add(strutils.repeat("    ",indentation) & transpile_command_to_c(last_command,command_stack,ascii))
+    return c_code
+
+proc transpile_to_c(main_command: Command, settings: settings_tuple) =
+    #prep
+    echo "Transpiling to C, \nNote: debug and break are unsupported, ascii_toogle is at compile time"
+    var c_code: seq[string] = @[]
+    var ascii: ref bool = new bool
+    ascii[] = settings.ascii
+    #transpile
+    c_code.add("#include <stdio.h>")
+    c_code.add("int main(){")
+    c_code.add("    int tape[" & $settings.tape_size & "] = {0};")
+    c_code.add("    int head = 0;")
+    c_code &= transpile_loop_to_c(main_command,ascii,1)
+    c_code.add("}")
+    #save
+    let f = open(settings.output_file, fmWrite)
+    for line in c_code:
+        f.write(line)
+        f.write("\n")
+    f.close()
+    echo "Created ",settings.output_file
+
 proc main() =
     var cli_args: seq[string]
-    let cli_arg_count = paramCount()
+    let cli_arg_count = paramCount() # includes executable name
     for arg_i in countup(1,cli_arg_count):
         cli_args.add(paramStr(arg_i))
     if cli_arg_count>0:
@@ -117,7 +198,9 @@ proc main() =
             "\n-a --ascii: display output as ascii" /
             "\n-at --ascii_toogle: add 'a' command to brainfuck, that toggles between ascii and number outputs" /
             "\n-d --debug: add 'd' command to brainfuck, that prints debug information" /
-            "\n-b --breaks: add 'b' command into brainfuck, that holds the code"
+            "\n-b --breaks: add 'b' command into brainfuck, that holds the code" /
+            "\n-s --tape_size: specify int tape size. default -s=128" /
+            "\n-tc --transpile_to_c: will transpile into a C file."
         else:
             var error_occured: bool = false
             var commandFile: string
@@ -127,9 +210,11 @@ proc main() =
                 echo "Error: Can't input open file"
                 error_occured = true
             if not error_occured:
-                var settings: settings_tuple = (false,false,false,false)
-                for arg in cli_args[0..^2]:
-                    case arg:
+                var settings: settings_tuple = (false,false,false,false,128,' ',cli_args[^1] & ".c")
+                var arg_i = 0
+                while arg_i<cli_arg_count-1:
+                    let arg = cli_args[arg_i].split('=')
+                    case arg[0]:
                         of "-a", "--ascii":
                             settings.ascii = true
                         of "-at", "--ascii_toogle":
@@ -138,9 +223,18 @@ proc main() =
                             settings.debug = true
                         of "-b", "--breaks":
                             settings.breaks = true
+                        of "-s", "--tape_size":
+                            settings.tape_size = parseInt(arg[1])
+                        of "-tc", "--transpile_to_c":
+                            settings.transpile = 'c'
                         else:
                             echo "Unknown argument: ", arg
-                run(compile(commandFile,settings),settings.ascii)
+                    arg_i+=1
+                if settings.transpile == ' ':
+                    run(compile(commandFile,settings),settings)
+                elif settings.transpile == 'c':
+                    transpile_to_c(compile(commandFile,settings),settings)
+                
     else:
         echo "No arguments! Enter -h for help"
 main()
