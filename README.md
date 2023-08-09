@@ -8,18 +8,21 @@ bf-code
 interpreters
 - `interpreter.nim` writting in [Nim](https://nim-lang.org/) (can handle comments; no bracket validator)
   - has extra options for debugging and printing. Type `--help` to see them.
+  - can transpile to C `-tc`
 
 ### Run commands
 `./interpreters/interpreter bf-code/`
 
 ### code segments
 ```c
-[-] \\zeros the slot
-[>+<-] \\moves a value 1 slot forward
-[>] \\ finds zero on the right
+[-] //zeros the slot
+[>+<-] //moves a value 1 slot forward
+[>] //finds zero on the right
+[>+<[->>+<<]] //if zero, 
 ```
-
 # TODO
 - [ ] in interperter, redesign ascii_toogle command (mb use ':' and ';' for numeric)
 - [ ] more transpilers & output filename option
 - [ ] fix transpiler spacing
+- [ ] 2d bf: add V and ^ commands
+- [ ] make a higher level language

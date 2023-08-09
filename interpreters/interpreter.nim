@@ -86,7 +86,7 @@ proc runCommand(command: Command, tape: ref seq[int], head: ref int, ascii: ref 
                 tape[][head[]]-=1
             of 4: #,
                 if ascii[]:
-                    tape[][head[]]=int(readChar(stdin))
+                    tape[][head[]]=ord(readChar(stdin))
                 else:
                     tape[][head[]]=parseInt(readLine(stdin))
             of 5: #.
@@ -110,6 +110,7 @@ proc run(main_command: Command, settings: settings_tuple) =
     var head: ref int = new int
     var ascii: ref bool = new bool
     ascii[] = settings.ascii
+    head[] = 0
     for sub_c in main_command.loop[]:
         runCommand(sub_c,tape,head,ascii)
 
@@ -129,12 +130,12 @@ proc transpile_command_to_c(command: int, command_stack: int, ascii: ref bool): 
             if ascii[]:
                 return "tape[head] = getchar();"
             else:
-                return "scanf(\"%d\",&tape[head])"
+                return "scanf(\"%d\",&tape[head]);"
         of 5:
             if ascii[]:
                 return "printf(\"%c\",tape[head]);"
             else:
-                return "printf(\"%d\",tape[head]);"
+                return "printf(\"%d\\n\",tape[head]);"
         of 6:
             ascii[]=not ascii[]
         else:
@@ -210,7 +211,7 @@ proc main() =
                 echo "Error: Can't input open file"
                 error_occured = true
             if not error_occured:
-                var settings: settings_tuple = (false,false,false,false,128,' ',cli_args[^1] & ".c")
+                var settings: settings_tuple = (false,false,false,false,256,' ',cli_args[^1] & ".c")
                 var arg_i = 0
                 while arg_i<cli_arg_count-1:
                     let arg = cli_args[arg_i].split('=')
