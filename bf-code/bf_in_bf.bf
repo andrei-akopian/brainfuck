@@ -96,7 +96,10 @@ Command List
         
     ]]]]]]]]]
 
-    >[-<+>] //move command code from 1 to 0
+    //|c=?,l=command index,backup=0,buffer=0,h=0|
+    //pointer postition: l
+
+    >[-<+>] //move command code from l to c
     <<<<<[->+>>>>+<<<<<]>[-<+>]>>>>+ //copy current command index into l variable
     >>>+ //build highway
         // build loop link (for previous command)
@@ -104,7 +107,7 @@ Command List
     <<<<< <<<<  // go to previous command
             [-
             >>>+<<< //check if command==1
-            [>>>-<<<[-<<+>>]]
+            [>>>-<<<[->>+<<]]
             >>+ //backup: account for minus 3 lines above 
             >[- //execute if buffer==1
                 >[-] //open highway enterance (on closing braket)
@@ -125,13 +128,12 @@ Command List
                 < //back to the closing braket's buffer
             ]
             <<< //back to c variable
-        ]>>[->>+<<]>> //return backup go to highway
+        ]>>[-<<+>>]>> //return backup & go to highway
     >>>>> // go back to the current command
-
 >+]<
 
 [<[-]<[-]<-<<] //back to start & clean up highway. Decrease command index by 1 to account for an off by 1 error.
-d
+
 /*
 Command List
     Structure: {|0|*10, |c,l,n,0,h|*x }
@@ -161,13 +163,12 @@ Command List
     [[->>>>>+<<<<<]+>>>>>--] // go to command index
     <<<<[-<[<<<<<] <<<<+>>>> >>>>>[>>>>>]<+<<<]// copy command into controller
     >>>[-<<<+>>>]>+[<<<<<] // clean up
-
     //execute command
     <<<<+
-    [- //case // opening braket TODO: openning brakets work differently than closing
+    [- //case // opening braket
         <<+>>
         [<<->>[-<+>]]
-        <<[- //execute
+        <<[-//execute
             //if tape[head]==0: increment command by 1
             //if tape[head]!=0: set command to the one specified in the loop variable
             >>>>[->>+<<]>>[-<<+>> >>>>>+<<<<<]>>>>>- //copy tape index onto highway
@@ -181,7 +182,7 @@ Command List
                 >>[-<<+>>]>+[<<<<<] //clean up & go back to highway start
                 >>>>>[-]// go to "skipable" postition on tape and exit
             ]<[-<+>]>[-]+ //clean up
-            <<<<[<<<<<] // go to highway start
+            [<<<<<] // go to highway start
             <<<<<+++++++++ //prevent other commands from executing
         <]
     ]>[- //case // closing braket
@@ -265,4 +266,3 @@ Command List
         ]
     ]>[-]>>>>+ //clean up, and increase command index
 >+]
-
