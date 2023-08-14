@@ -140,11 +140,11 @@ Command List
     Zeros (controller):
         0th: 
         1st:
-        2nd:
-        3rd: execution trigger
-        4th: cammand
-        5st: command
-        6nd: n of active loops
+        2nd: 
+        3rd: zero
+        4th: command
+        5st: execution trigger
+        6nd: n of active loops (unused)
         7rd: tape index
         8th: command index
         9th: highway start
@@ -155,114 +155,102 @@ Command List
         0: empty slot
         h: =1; highway segment
 */
-
 //running the code
-+[-
++[- 
     //get command
-    <[->+<]>[-<+> >>>>>+<<<<<]>>>>>- //copy command index onto highway
-    [[->>>>>+<<<<<]+>>>>>--] // go to command index
-    <<<<[-<[<<<<<] <<<<+>>>> >>>>>[>>>>>]<+<<<]// copy command into controller
-    >>>[-<<<+>>>]>+[<<<<<] // clean up
+    <[->+<]>[-<+> >>>>>+<<<<<] >>>>> - //copy command index onto the highway
+    [[->>>>>+<<<<<]+>>>>>--] //go to command index
+    <<<< [-< [<<<<<] <<<<< + >>>>> >>>>> [>>>>>] <+<<<] //copy command into control
+    >>>[-<<<+>>>]> + [<<<<<]//clean up
     //execute command
-    <<<<+
-    [- //case // opening braket
-        <<+>>
-        [<<->>[-<+>]]
-        <<[-//execute
-            //if tape[head]==0: increment command by 1
-            //if tape[head]!=0: set command to the one specified in the loop variable
-            >>>>[->>+<<]>>[-<<+>> >>>>>+<<<<<]>>>>>- //copy tape index onto highway
-            [[->>>>>+<<<<<]+>>>>>--]+ // go to tape index and close the highway behind you
-            <<[>>-<<[->+<]]>>
-            [// ==0 case
-                [<<<<<] //go back to start
-                <[->+<]>[->>>>>+<<<<<]>>>>>- //copy command index onto highway while zerroring the command index slot
-                [[->>>>>+<<<<<]+>>>>>--] // go to command index
-                <<<[->>+<< <<[<<<<<]<+>>>>>>[>>>>>]<<<] // copy loop variable into command index
-                >>[-<<+>>]>+[<<<<<] //clean up & go back to highway start
-                >>>>>[-]// go to "skipable" postition on tape and exit
-            ]<[-<+>]>[-]+ //clean up
-            [<<<<<] // go to highway start
-            <<<<<+++++++++ //prevent other commands from executing
+    <<<<<+<// go to zero
+    >[- // openning braket
+        >+< //set execution trigger
+        [>-] //remove execution trigger if !=0
+        <[<] //finish
+        >>[- //execute
+
+        <] 
+    ]<[<] //back to 0
+    >[- // closing braket
+        >+< //set execution trigger
+        [>-] //remove execution trigger if !=0
+        <[<] //finish
+        >>[- //execute
+            
         <]
-    ]>[- //case // closing braket
-        <+>
-        [<->[->+<]]
-        <[- //execute
-            //if tape[head]==0: increment command by 1
-            //if tape[head]!=0: set command to the one specified in the loop variable
-            >>>>[->>+<<]>>[-<<+>> >>>>>+<<<<<]>>>>>- //copy tape index onto highway
-            [[->>>>>+<<<<<]+>>>>>--]+ // go to tape index
-            <<[// !=0 case
-                >>[<<<<<] //go back to start
-                <[->+<]>[->>>>>+<<<<<]>>>>>- //copy command index onto highway while zerroring the command index slot
-                [[->>>>>+<<<<<]+>>>>>--] // go to command index
-                <<<[->>+<< <<[<<<<<]<+>>>>>>[>>>>>]<<<] // copy loop variable into command index
-                >>[-<<+>>]>+[<<<<<] //clean up & go back to highway start
-                >>>[->+<]// go to "skipable" postition on tape and exit
-            ]>[-<+>] //clean up
-            <<<<[<<<<<] // go to highway start
-            <<<<++++++++ //prevent other commands from executing
-        <<]
-    ]>>[- //case +
-        <<+>>
-        [<<->>[-<+>]]
-        <<[- //execute
-            >>>>[->>+<<]>>[-<<+>> >>>>>+<<<<<]>>>>>- //copy tape index onto highway
-            [[->>>>>+<<<<<]+>>>>>--]+ // go to tape index
-            <<+ //incrament number
-            <<<[<<<<<] //go back
-            <<<<<+++++++ //prevent other commands from executing
+    ]<[<] //back to 0
+    >[- // plus
+        >+< //set execution trigger
+        [>-] //remove execution trigger if !=0
+        <[<] //finish
+        >>[- //execute
+            >>[->>+<<]>>[-<<+>> >>>>>+<<<<<]>>>>>- //copy tape index onto highway
+            [[->>>>>+<<<<<]+>>>>>--] // go to tape index
+            <<+ //do the operation
+            >>+[<<<<<] //cleanup and back
+            <<<< // back to execution trigger
         <]
-    ]>[- //case -
-        <+>
-        [<->[->+<]]
-        <[- //execute
-            >>>>[->>+<<]>>[-<<+>> >>>>>+<<<<<]>>>>>- //copy tape index onto highway
-            [[->>>>>+<<<<<]+>>>>>--]+ // go to tape index
-            <<- //incrament tape index
-            <<<[<<<<<] //go back
-            <<<<++++++ //prevent other commands from executing (note the number of +es)
-        <<]
-    ]>>[- //case >
-        <<+>>
-        [<<->>[-<+>]]
-        <<[- //execute
-            >>>>+
-            <<<+++++ //prevent other commands from executing
+    ]<[<] //back to 0
+    >[- // minus
+        >+< //set execution trigger
+        [>-] //remove execution trigger if !=0
+        <[<] //finish
+        >>[- //execute
+            >>[->>+<<]>>[-<<+>> >>>>>+<<<<<]>>>>>- //copy tape index onto highway
+            [[->>>>>+<<<<<]+>>>>>--] // go to tape index
+            <<- //do the operation
+            >>+[<<<<<] //cleanup and back
+            <<<< // back to execution trigger
         <]
-    ]>[- //case <
-        <+>
-        [<->[->+<]]
-        <[- //execute
-            >>>>-
-            <<++++ //prevent other commands from executing
-        <<]
-    ]>>[- //case ,
-        <<+>>
-        [<<->>[-<+>]]
-        <<[- //execute
-            >>>>[->>+<<]>>[-<<+>> >>>>>+<<<<<]>>>>>- //copy tape index onto highway
-            [[->>>>>+<<<<<]+>>>>>--]+ // go to tape index
-            <<, //take input
-            <<<[<<<<<] //go back
-            <<<<<+++ //prevent other commands from executing
+    ]<[<] //back to 0
+    >[- // forward
+        >+< //set execution trigger
+        [>-] //remove execution trigger if !=0
+        <[<] //finish
+        >>[- //execute
+            >>+<<
         <]
-    ]>[- //case .
-        <+>
-        [<->[->+<]]
-        <[- //execute
-            >>>>[->>+<<]>>[-<<+>> >>>>>+<<<<<]>>>>>- //copy tape index onto highway
-            [[->>>>>+<<<<<]+>>>>>--]+ // go to tape index
-            <<. //print
-            <<<[<<<<<] //go back
-            <<<<++ //prevent other commands from executing (note the number of +es)
-        <<]
-    ]>>[- //case !
-        <<+>>
-        [<<->>[-<+>]]
-        <<[- //execute
-            >>>>>>-<<<<<<
-        ]
-    ]>[-]>>>>+ //clean up, and increase command index
->+]
+    ]<[<] //back to 0
+    >[- // backwards
+        >+< //set execution trigger
+        [>-] //remove execution trigger if !=0
+        <[<] //finish
+        >>[- //execute
+            >>-<<
+        <]
+    ]<[<] //back to 0
+    >[- // read input
+        >+< //set execution trigger
+        [>-] //remove execution trigger if !=0
+        <[<] //finish
+        >>[- //execute
+            >>[->>+<<]>>[-<<+>> >>>>>+<<<<<]>>>>>- //copy tape index onto highway
+            [[->>>>>+<<<<<]+>>>>>--] // go to tape index
+            <<, //do the operation
+            >>+[<<<<<] //cleanup and back
+            <<<< // back to execution trigger
+        <]
+    ]<[<] //back to 0
+    >[- // output
+        >+< //set execution trigger
+        [>-] //remove execution trigger if !=0
+        <[<] //finish
+        >>[- //execute
+            >>[->>+<<]>>[-<<+>> >>>>>+<<<<<]>>>>>- //copy tape index onto highway
+            [[->>>>>+<<<<<]+>>>>>--] // go to tape index
+            <<. //do the operation
+            >>+[<<<<<] //cleanup and back
+            <<<< // back to execution trigger
+        <]
+    ]<[<] //back to 0
+    >[- // end
+        >+< //set execution trigger
+        [>-] //remove execution trigger if !=0
+        <[<] //finish
+        >>[- //execute
+            >>>>-<<<<
+        <]
+    ]<[<] //back to 0
+    >>>>>+>+
+]

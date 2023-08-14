@@ -188,6 +188,44 @@ proc transpile_to_c(main_command: Command, settings: settings_tuple) =
     f.close()
     echo "Created ",settings.output_file
 
+proc transpile_loop_to_bf(command: Command): seq[char] =
+    var bf_code: seq[char] = @[]
+    for this_command in command[].loop[]:
+        if this_command.link_to_loop:
+            bf_code.add('[')
+            bf_code &= transpile_loop_to_bf(this_command)
+            bf_code.add(']')
+        else:
+            case this_command.command:
+                of 0:
+                    bf_code.add('>')
+                of 1:
+                    bf_code.add('<')
+                of 2:
+                    bf_code.add('+')
+                of 3:
+                    bf_code.add('-')
+                of 4:
+                    bf_code.add(',')
+                of 5:
+                    bf_code.add('.')
+                else:
+                    discard
+    return bf_code
+
+proc transpile_to_bf(main_command: Command, settings: settings_tuple) =
+    #prep
+    echo "Transpiling to BF"
+    var bf_code: seq[char] = @[]
+    #transpile
+    bf_code &= transpile_loop_to_bf(main_command)
+    #save
+    let f = open(settings.output_file, fmWrite)
+    for c in bf_code:
+        f.write(c)
+    f.close()
+    echo "Created ",settings.output_file
+
 proc main() =
     var cli_args: seq[string]
     let cli_arg_count = paramCount() # includes executable name
@@ -201,7 +239,8 @@ proc main() =
             "\n-d --debug: add 'd' command to brainfuck, that prints debug information" /
             "\n-b --breaks: add 'b' command into brainfuck, that holds the code" /
             "\n-s --tape_size: specify int tape size. default -s=128" /
-            "\n-tc --transpile_to_c: will transpile into a C file."
+            "\n-tc --transpile_to_c: will transpile into a C file." /
+            "\n-tbf --transpile_to_bf: will clean up the bf code"
         else:
             var error_occured: bool = false
             var commandFile: string
@@ -228,6 +267,10 @@ proc main() =
                             settings.tape_size = parseInt(arg[1])
                         of "-tc", "--transpile_to_c":
                             settings.transpile = 'c'
+                            settings.output_file = cli_args[^1] & ".c"
+                        of "-tbf", "--transpile_to_bf":
+                            settings.transpile = 'b'
+                            settings.output_file = cli_args[^1] & ".bf"
                         else:
                             echo "Unknown argument: ", arg
                     arg_i+=1
@@ -235,6 +278,8 @@ proc main() =
                     run(compile(commandFile,settings),settings)
                 elif settings.transpile == 'c':
                     transpile_to_c(compile(commandFile,settings),settings)
+                elif settings.transpile == 'b':
+                    transpile_to_bf(compile(commandFile,settings),settings)
                 
     else:
         echo "No arguments! Enter -h for help"
